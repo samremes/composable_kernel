@@ -21,16 +21,16 @@ namespace {
 
 struct GroupedGemmKernelParam
 {
-    static const bool kPadM        = false;
-    static const bool kPadN        = false;
-    static const bool kPadK        = false;
+    static const bool kPadM        = true;
+    static const bool kPadN        = true;
+    static const bool kPadK        = true;
     static const bool kTilePermute = false;
 
     static const ck_tile::index_t kOutputRank = 2;
 
     static const int kBlockPerCu         = 1;
-    static const ck_tile::index_t M_Tile = 128;
-    static const ck_tile::index_t N_Tile = 128;
+    static const ck_tile::index_t M_Tile = 256;
+    static const ck_tile::index_t N_Tile = 256;
     static const ck_tile::index_t K_Tile = 32;
 
     static const ck_tile::index_t M_Warp = 2;

@@ -56,6 +56,9 @@ int run_grouped_gemm_example_with_layouts(int argc,
     const int group_count = arg_parser.get_int("group_count");
     const int repeat      = arg_parser.get_int("repeat");
     const int warmup      = arg_parser.get_int("warmup");
+    const int m           = arg_parser.get_int("m");
+    const int n           = arg_parser.get_int("n");
+    const int k           = arg_parser.get_int("k");
 
     std::vector<ck_tile::index_t> Ms;
     std::vector<ck_tile::index_t> Ns;
@@ -66,9 +69,9 @@ int run_grouped_gemm_example_with_layouts(int argc,
 
     for(int i = 0; i < group_count; i++)
     {
-        Ms.push_back(256 + 256 * i);
-        Ns.push_back(128 + 128 * i);
-        Ks.push_back(128 + 64 * i);
+        Ms.push_back(m);
+        Ns.push_back(n);
+        Ks.push_back(k);
 
         stride_As.push_back(Ks[i]);
         stride_Bs.push_back(Ks[i]);

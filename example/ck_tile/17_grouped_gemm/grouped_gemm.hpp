@@ -13,15 +13,15 @@ template <typename DataType>
 struct GemmBasicTypeConfig;
 
 template <>
-struct GemmBasicTypeConfig<ck_tile::half_t>
+struct GemmBasicTypeConfig<ck_tile::bhalf_t>
 {
-    using ADataType   = ck_tile::half_t;
-    using BDataType   = ck_tile::half_t;
-    using CDataType   = ck_tile::half_t;
+    using ADataType   = ck_tile::bhalf_t;
+    using BDataType   = ck_tile::bhalf_t;
+    using CDataType   = ck_tile::bhalf_t;
     using AccDataType = float;
 };
 
-using Types = GemmBasicTypeConfig<ck_tile::half_t>;
+using Types = GemmBasicTypeConfig<ck_tile::bhalf_t>;
 
 // Specific type aliases for easy access
 using ADataType   = Types::ADataType;
@@ -37,9 +37,12 @@ auto create_args(int argc, char* argv[])
     arg_parser.insert("a_layout", "R", "A tensor data layout - Row by default")
         .insert("b_layout", "R", "B tensor data layout - Row by default")
         .insert("c_layout", "R", "C tensor data layout - Row by default")
-        .insert("validate", "1", "0. No validation, 1. Validation on CPU")
+        .insert("validate", "0", "0. No validation, 1. Validation on CPU")
         .insert("warmup", "10", "number of iterations before benchmark the kernel")
         .insert("repeat", "100", "number of iterations to benchmark the kernel")
+        .insert("m", "1024", "M dimension")
+        .insert("n", "10752", "N dimension")
+        .insert("k", "6144", "K dimension")
         .insert("group_count", "16", "group count");
 
     bool result = arg_parser.parse(argc, argv);
