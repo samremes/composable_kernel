@@ -13,15 +13,15 @@ template <typename DataType>
 struct GemmBasicTypeConfig;
 
 template <>
-struct GemmBasicTypeConfig<ck_tile::bhalf_t>
+struct GemmBasicTypeConfig<ck_tile::bfloat16_t>
 {
-    using ADataType   = ck_tile::bhalf_t;
-    using BDataType   = ck_tile::bhalf_t;
-    using CDataType   = ck_tile::bhalf_t;
+    using ADataType   = ck_tile::bfloat16_t;
+    using BDataType   = ck_tile::bfloat16_t;
+    using CDataType   = ck_tile::bfloat16_t;
     using AccDataType = float;
 };
 
-using Types = GemmBasicTypeConfig<ck_tile::bhalf_t>;
+using Types = GemmBasicTypeConfig<ck_tile::bfloat16_t>;
 
 // Specific type aliases for easy access
 using ADataType   = Types::ADataType;
@@ -35,7 +35,7 @@ auto create_args(int argc, char* argv[])
 {
     ck_tile::ArgParser arg_parser;
     arg_parser.insert("a_layout", "R", "A tensor data layout - Row by default")
-        .insert("b_layout", "R", "B tensor data layout - Row by default")
+        .insert("b_layout", "C", "B tensor data layout - C by default")
         .insert("c_layout", "R", "C tensor data layout - Row by default")
         .insert("validate", "0", "0. No validation, 1. Validation on CPU")
         .insert("warmup", "10", "number of iterations before benchmark the kernel")
