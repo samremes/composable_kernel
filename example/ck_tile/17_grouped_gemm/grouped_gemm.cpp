@@ -31,7 +31,7 @@ struct GroupedGemmKernelParam
     static const int kBlockPerCu         = 1;
     static const ck_tile::index_t M_Tile = 256;
     static const ck_tile::index_t N_Tile = 256;
-    static const ck_tile::index_t K_Tile = 64;
+    static const ck_tile::index_t K_Tile = 32;
 
     static const ck_tile::index_t M_Warp = 2;
     static const ck_tile::index_t N_Warp = 2;
@@ -83,18 +83,23 @@ using CodegenGemmTraits = ck_tile::TileGemmTraits<GroupedGemmKernelParam::kPadM,
 
 template <typename ALayout, typename BLayout, typename CLayout>
 using CodegenPipelineProblem =
-    ck_tile::GemmPipelineProblem<ADataType,
+    // ck_tile::GemmPipelineProblem<ADataType,
+    ck_tile::UniversalGemmPipelineProblem<ADataType,
                                  BDataType,
                                  AccDataType,
                                  CodegenGemmShape,
                                  CodegenGemmTraits<ALayout, BLayout, CLayout>>;
 
-using CodegenGemmPolicy = ck_tile::UniversalGemmPipelineAgBgCrPolicy;
+// using CodegenGemmPolicy = ck_tile::UniversalGemmPipelineAgBgCrPolicy;
+using CodegenGemmPolicy = ck_tile::GemmPipelineAGmemBGmemCRegV1DefaultPolicy;
 
 template <typename ALayout, typename BLayout, typename CLayout>
+// using CodegenGemmPipeline =
+//     ck_tile::GemmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem<ALayout, BLayout, CLayout>,
+//                                           CodegenGemmPolicy>;
 using CodegenGemmPipeline =
-    ck_tile::GemmPipelineAGmemBGmemCRegV1<CodegenPipelineProblem<ALayout, BLayout, CLayout>,
-                                          CodegenGemmPolicy>;
+    ck_tile::GemmPipelineAgBgCrCompV3<CodegenPipelineProblem<ALayout, BLayout, CLayout>,
+                                      CodegenGemmPolicy>;
 
 template <typename ALayout, typename BLayout, typename CLayout>
 using Kernel = ck_tile::GroupedGemmKernel<TilePartitioner,

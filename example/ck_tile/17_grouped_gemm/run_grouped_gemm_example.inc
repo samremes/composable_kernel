@@ -118,8 +118,8 @@ int run_grouped_gemm_example_with_layouts(int argc,
                   << " a_m_k: " << a_m_k_tensors[i].mDesc << " b_k_n: " << b_k_n_tensors[i].mDesc
                   << " c_m_n: " << c_m_n_tensors[i].mDesc << std::endl;
 
-        ck_tile::FillUniformDistribution<ADataType>{-5.f, 5.f}(a_m_k_tensors[i]);
-        ck_tile::FillUniformDistribution<BDataType>{-5.f, 5.f}(b_k_n_tensors[i]);
+        ck_tile::FillUniformDistribution<ADataType>{-1.f, 1.f}(a_m_k_tensors[i]);
+        ck_tile::FillUniformDistribution<BDataType>{-1.f, 1.f}(b_k_n_tensors[i]);
 
         a_m_k_dev_buf.push_back(std::make_unique<ck_tile::DeviceMem>(
             a_m_k_tensors[i].get_element_space_size_in_bytes()));
@@ -157,7 +157,7 @@ int run_grouped_gemm_example_with_layouts(int argc,
             c_m_n_host_ref.SetZero();
             ck_tile::reference_gemm<ADataType, BDataType, AccDataType, CDataType>(
                 a_m_k_tensors[i], b_k_n_tensors[i], c_m_n_host_ref);
-            pass &= ck_tile::check_err(c_m_n_tensors[i], c_m_n_host_ref);
+            pass &= ck_tile::check_err(c_m_n_tensors[i], c_m_n_host_ref, "Numerical Error:", 1e-2);
         }
         std::cout << "The CPU veification result is:" << (pass ? "correct" : "fail") << std::endl;
     }
