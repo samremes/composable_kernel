@@ -371,6 +371,43 @@ __global__ void
                         b2c_tile_map);
                 }
             }
+            else
+            {
+                if(GridwiseGemm::CalculateKBlockLoopTailNum(K_split) == TailNumber::Odd)
+                {
+                    GridwiseGemm::template Run<OffsettedBlockToCTileMap,
+                                                    true,
+                                                    InMemoryDataOperationEnum::Set,
+                                                    TailNumber::Odd>(
+                        static_cast<const ADataType*>(gemm_desc_ptr[group_id].p_a_grid),
+                        static_cast<const BDataType*>(gemm_desc_ptr[group_id].p_b_grid),
+                        p_ds_grid,
+                        static_cast<EDataType*>(gemm_desc_ptr[group_id].p_e_grid),
+                        static_cast<void*>(p_shared),
+                        problem,
+                        a_element_op,
+                        b_element_op,
+                        cde_element_op,
+                        b2c_tile_map);
+                }
+                else
+                {
+                    GridwiseGemm::template Run<OffsettedBlockToCTileMap,
+                                                    true,
+                                                    InMemoryDataOperationEnum::Set,
+                                                    TailNumber::Even>(
+                        static_cast<const ADataType*>(gemm_desc_ptr[group_id].p_a_grid),
+                        static_cast<const BDataType*>(gemm_desc_ptr[group_id].p_b_grid),
+                        p_ds_grid,
+                        static_cast<EDataType*>(gemm_desc_ptr[group_id].p_e_grid),
+                        static_cast<void*>(p_shared),
+                        problem,
+                        a_element_op,
+                        b_element_op,
+                        cde_element_op,
+                        b2c_tile_map);
+                }
+            }
         }
         else
         {
