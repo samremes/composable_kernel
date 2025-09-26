@@ -580,6 +580,46 @@ struct FusedMoeGemmPipelineFlatmmPolicy
                 WarpGemmAttributeMfmaImpl_i32_32x32x16_i8<wg_ctrl>,
                 2>>{};
         }
+        else if constexpr(std::is_same_v<typename Problem::ADataType, ck_tile::fp8_t> &&
+                          std::is_same_v<typename Problem::GDataType, ck_tile::fp8_t> &&
+                          S_::Warp_M0 == 32 && S_::Warp_N0 == 32 && S_::Warp_K0 == 32)
+        {
+            return WarpGemmImpl<WarpGemmAttributeMfmaIterateKAndTransposedCDistribution_SwizzleB<
+                WarpGemmAttributeMfmaImpl_f32_32x32x16_fp8_fp8<wg_ctrl>,
+                2>>{};
+        }
+    }
+
+    template <typename Problem>
+    CK_TILE_HOST_DEVICE static constexpr auto GetWarpGemm1()
+    {
+        using S_               = typename Problem::BlockShape;
+        constexpr auto wg_ctrl = WGAttrCtlEnum::Raw_avv;
+        // TODO: ugly
+        if constexpr(std::is_same_v<typename Problem::YDataType, ck_tile::bf16_t> &&
+                     std::is_same_v<typename Problem::DDataType, ck_tile::bf16_t> &&
+                     S_::Warp_M0 == 32 && S_::Warp_N0 == 32 && S_::Warp_K0 == 16)
+        {
+            return WarpGemmImpl<WarpGemmAttributeMfmaIterateKAndTransposedCDistribution_SwizzleB<
+                WarpGemmAttributeMfmaImplBf16Bf16F32M32N32K8<wg_ctrl>,
+                2>>{};
+        }
+        else if constexpr(std::is_same_v<typename Problem::YDataType, ck_tile::int8_t> &&
+                          std::is_same_v<typename Problem::DDataType, ck_tile::int8_t> &&
+                          S_::Warp_M0 == 32 && S_::Warp_N0 == 32 && S_::Warp_K0 == 32)
+        {
+            return WarpGemmImpl<WarpGemmAttributeMfmaIterateKAndTransposedCDistribution_SwizzleB<
+                WarpGemmAttributeMfmaImpl_i32_32x32x16_i8<wg_ctrl>,
+                2>>{};
+        }
+        else if constexpr(std::is_same_v<typename Problem::YDataType, ck_tile::fp8_t> &&
+                          std::is_same_v<typename Problem::DDataType, ck_tile::fp8_t> &&
+                          S_::Warp_M0 == 32 && S_::Warp_N0 == 32 && S_::Warp_K0 == 32)
+        {
+            return WarpGemmImpl<WarpGemmAttributeMfmaIterateKAndTransposedCDistribution_SwizzleB<
+                WarpGemmAttributeMfmaImpl_f32_32x32x16_fp8_fp8<wg_ctrl>,
+                2>>{};
+        }
     }
 
     template <typename Problem>
@@ -629,6 +669,24 @@ struct FusedMoeGemmPipelineFlatmmPolicy
                             GLD_B,  GLD_A,  GLD_B,  GLD_A,  GLD_B,  GLD_A,  GLD_B,  GLD_A,    // 1
                             GLD_B,  SLD_A,  GLD_B,  SLD_A,  GLD_B,  SLD_A,  GLD_B,  SLD_A,    // 2
                             GLD_B,  SLD_A,  GLD_B,  SLD_A,  GLD_B,  SLD_A,  GLD_B,  SLD_A>{};    // 3
+            return seq_all;
+            // clang-format on
+        }
+        else if constexpr(std::is_same_v<typename Problem::YDataType, ck_tile::fp8_t> &&
+                     std::is_same_v<typename Problem::DDataType, ck_tile::fp8_t> &&
+                     S_::Warp_M0 == 32 && S_::Warp_N0 == 32 && S_::Warp_K0 == 32 &&
+                     S_::Block_M0 == 32 && S_::Block_N0 == 512 && S_::Block_K0 == 128 &&
+                     S_::Block_N1 == 128)
+        {
+            // FP8: we should have less mfma instructions with the same block size compared to fp16???
+            // TODO: How to align the loads properly??
+            // clang-format off
+            constexpr auto seq_all =
+                    //       0       1       2        3       4      5        6       7
+                   sequence<GLD_B,  GLD_A,      0,      0,  GLD_B,  GLD_A,      0,      0,    // 0
+                            GLD_B,  GLD_A,      0,      0,  GLD_B,  GLD_A,      0,      0,    // 1
+                            GLD_B,  SLD_A,      0,      0,  GLD_B,  SLD_A,      0,      0,    // 2
+                            GLD_B,  SLD_A,      0,      0,  GLD_B,  SLD_A,      0,      0>{};    // 3
             return seq_all;
             // clang-format on
         }
@@ -683,29 +741,24 @@ struct FusedMoeGemmPipelineFlatmmPolicy
             return seq_all;
             // clang-format on
         }
-    }
-
-    template <typename Problem>
-    CK_TILE_HOST_DEVICE static constexpr auto GetWarpGemm1()
-    {
-        using S_               = typename Problem::BlockShape;
-        constexpr auto wg_ctrl = WGAttrCtlEnum::Raw_avv;
-        // TODO: ugly
-        if constexpr(std::is_same_v<typename Problem::YDataType, ck_tile::bf16_t> &&
-                     std::is_same_v<typename Problem::DDataType, ck_tile::bf16_t> &&
-                     S_::Warp_M0 == 32 && S_::Warp_N0 == 32 && S_::Warp_K0 == 16)
+        else if constexpr(std::is_same_v<typename Problem::YDataType, ck_tile::fp8_t> &&
+                          std::is_same_v<typename Problem::DDataType, ck_tile::fp8_t> &&
+                          S_::Warp_M1 == 32 && S_::Warp_N1 == 32 && S_::Warp_K1 == 32 &&
+                          S_::Block_M0 == 32 && S_::Block_N0 == 512 && S_::Block_K0 == 128 &&
+                          S_::Block_N1 == 128)
         {
-            return WarpGemmImpl<WarpGemmAttributeMfmaIterateKAndTransposedCDistribution_SwizzleB<
-                WarpGemmAttributeMfmaImplBf16Bf16F32M32N32K8<wg_ctrl>,
-                2>>{};
-        }
-        else if constexpr(std::is_same_v<typename Problem::YDataType, ck_tile::int8_t> &&
-                          std::is_same_v<typename Problem::DDataType, ck_tile::int8_t> &&
-                          S_::Warp_M0 == 32 && S_::Warp_N0 == 32 && S_::Warp_K0 == 32)
-        {
-            return WarpGemmImpl<WarpGemmAttributeMfmaIterateKAndTransposedCDistribution_SwizzleB<
-                WarpGemmAttributeMfmaImpl_i32_32x32x16_i8<wg_ctrl>,
-                2>>{};
+            // FP8: we should have less mfma instructions with the same block size compared to fp16
+            // Total 64 instructions, 32 buffer-load-dwordx4 gld_b, 8x buffer-load-dwordx1-async
+            // gld_a 8x ds_read_b128 sld_a total 64 slot :)
+            // clang-format off
+            constexpr auto seq_all =
+                    //       0       1       2        3       4      5        6       7
+                   sequence<    0,      0,  GLD_B,  GST_O,      0,      0,  GLD_B,  GST_O,    // 0
+                                0,      0,  GLD_B,  GST_O,      0,      0,  GLD_B,  GST_O,    // 1
+                                0,      0,  GLD_B,      0,      0,      0,  GLD_B,      0,    // 2
+                                0,      0,  GLD_B,      0,      0,      0,  GLD_B,      0>{};    // 3
+            return seq_all;
+            // clang-format on
         }
     }
 

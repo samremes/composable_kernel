@@ -146,7 +146,7 @@ struct FusedMoeGemmKernel
     using YDataType            = typename Pipeline::Problem::YDataType;
 
     using Traits                = typename Pipeline::Problem::Traits;
-    static constexpr bool UseUK = true;
+    static constexpr bool UseUK = false;
 
     static constexpr bool IsGateOnly          = Traits::IsGateOnly;
     static constexpr bool UseSmoothQuant      = Traits::UseSmoothQuant;
@@ -415,8 +415,7 @@ struct FusedMoeGemmKernel
                        topk_weight,
                        smem,
                        kargs.hidden_size,
-                       kargs.intermediate_size,
-                       kargs.stride_token);
+                       kargs.intermediate_size);
         }
     }
 };

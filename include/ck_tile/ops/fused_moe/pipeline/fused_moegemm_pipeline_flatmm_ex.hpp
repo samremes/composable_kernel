@@ -435,7 +435,13 @@ struct FusedMoeGemmPipeline_FlatmmEx
         auto pipeline_gemm0 = [&]() {
             constexpr index_t total_loops = issues_gemm0;
             constexpr auto sr             = Policy::template GetSequencer_0<Problem>();
+            
+            // Check consistency of the sequencer number of slots, loads, stores
             static_assert(sr.size() == total_loops);
+            static_assert(sr.transform([](auto x) { return x == SLD_A; }).sum() == issues_a);
+            static_assert(sr.transform([](auto x) { return x == GLD_A; }).sum() == issues_a);
+            // constexpr auto issues_g_gate = issues_g / (IsGateOnly ? 1 : 2);
+            // static_assert(sr.transform([](auto x) { return x == GLD_B; }).sum() == issues_g_gate);
 
             constexpr auto c_sld_a_0 = MAKE_SC();
             constexpr auto c_gld_a_0 = MAKE_SC();
