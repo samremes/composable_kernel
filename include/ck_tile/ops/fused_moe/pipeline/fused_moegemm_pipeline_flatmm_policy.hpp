@@ -678,15 +678,15 @@ struct FusedMoeGemmPipelineFlatmmPolicy
                      S_::Block_M0 == 32 && S_::Block_N0 == 512 && S_::Block_K0 == 128 &&
                      S_::Block_N1 == 128)
         {
-            // FP8: we should have less mfma instructions with the same block size compared to fp16???
-            // TODO: How to align the loads properly??
+            // FP8: 32 elements total matching BF16 256 case due to K=32 vs K=16 ratio
+            // Same memory access pattern but half the K iterations
             // clang-format off
             constexpr auto seq_all =
                     //       0       1       2        3       4      5        6       7
-                   sequence<GLD_B,  GLD_A,      0,      0,  GLD_B,  GLD_A,      0,      0,    // 0
-                            GLD_B,  GLD_A,      0,      0,  GLD_B,  GLD_A,      0,      0,    // 1
-                            GLD_B,  SLD_A,      0,      0,  GLD_B,  SLD_A,      0,      0,    // 2
-                            GLD_B,  SLD_A,      0,      0,  GLD_B,  SLD_A,      0,      0>{};    // 3
+                   sequence<GLD_B,  GLD_A,  GLD_B,  GLD_A,  GLD_B,  GLD_A,  GLD_B,  GLD_A,    // 0
+                            GLD_B,  GLD_A,  GLD_B,  GLD_A,  GLD_B,  GLD_A,  GLD_B,  GLD_A,    // 1
+                            GLD_B,  SLD_A,  GLD_B,  SLD_A,  GLD_B,  SLD_A,  GLD_B,  SLD_A,    // 2
+                            GLD_B,  SLD_A,  GLD_B,  SLD_A,  GLD_B,  SLD_A,  GLD_B,  SLD_A>{};   // 3
             return seq_all;
             // clang-format on
         }
@@ -747,16 +747,14 @@ struct FusedMoeGemmPipelineFlatmmPolicy
                           S_::Block_M0 == 32 && S_::Block_N0 == 512 && S_::Block_K0 == 128 &&
                           S_::Block_N1 == 128)
         {
-            // FP8: we should have less mfma instructions with the same block size compared to fp16
-            // Total 64 instructions, 32 buffer-load-dwordx4 gld_b, 8x buffer-load-dwordx1-async
-            // gld_a 8x ds_read_b128 sld_a total 64 slot :)
+            // FP8: 32 elements matching BF16 256 case pattern due to K=32 vs K=16 ratio
             // clang-format off
             constexpr auto seq_all =
                     //       0       1       2        3       4      5        6       7
-                   sequence<    0,      0,  GLD_B,  GST_O,      0,      0,  GLD_B,  GST_O,    // 0
-                                0,      0,  GLD_B,  GST_O,      0,      0,  GLD_B,  GST_O,    // 1
-                                0,      0,  GLD_B,      0,      0,      0,  GLD_B,      0,    // 2
-                                0,      0,  GLD_B,      0,      0,      0,  GLD_B,      0>{};    // 3
+                   sequence<GLD_B,  GST_O,  GLD_B,  GST_O,  GLD_B,  GST_O,  GLD_B,  GST_O,    // 0
+                            GLD_B,  GST_O,  GLD_B,  GST_O,  GLD_B,  GST_O,  GLD_B,  GST_O,    // 1
+                            GLD_B,      0,  GLD_B,      0,  GLD_B,      0,  GLD_B,      0,    // 2
+                            GLD_B,      0,  GLD_B,      0,  GLD_B,      0,  GLD_B,      0>{};   // 3
             return seq_all;
             // clang-format on
         }

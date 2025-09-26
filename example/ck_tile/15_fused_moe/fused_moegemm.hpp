@@ -61,6 +61,22 @@ struct FusedMoeGemmTypeConfig<ck_tile::int8_t, ck_tile::int8_t, ck_tile::bf16_t,
     using IndexDataType        = ck_tile::index_t;
 };
 
+template <typename ST, typename SW, typename SQ, typename KW>
+struct FusedMoeGemmTypeConfig<ck_tile::fp8_t, ck_tile::fp8_t, ck_tile::bf16_t, ST, SW, SQ, KW>
+{
+    using ADataType            = ck_tile::fp8_t;
+    using GDataType            = ck_tile::fp8_t;
+    using DDataType            = ck_tile::fp8_t;
+    using AccDataType          = float;
+    using ODataType            = ck_tile::bf16_t;
+    using AScaleDataType       = ck_tile::remove_cvref_t<ST>;
+    using GScaleDataType       = ck_tile::remove_cvref_t<SW>;
+    using DScaleDataType       = ck_tile::remove_cvref_t<SW>;
+    using YSmoothScaleDataType = ck_tile::remove_cvref_t<SQ>;
+    using TopkWeightDataType   = ck_tile::remove_cvref_t<KW>;
+    using IndexDataType        = ck_tile::index_t;
+};
+
 // runtime args
 struct fused_moegemm_args : public ck_tile::FusedMoeGemmHostArgs
 {

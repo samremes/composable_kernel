@@ -93,7 +93,7 @@ auto create_args(int argc, char* argv[])
     ck_tile::ArgParser arg_parser;
     arg_parser
         .insert("t",
-                "128",
+                "32",
                 "number of input tokens.\n"
                 "If \"local_t\" presents, this value indicates global concurrency of all ranks.")
         .insert(
@@ -104,16 +104,16 @@ auto create_args(int argc, char* argv[])
             "This feature is to simulate EP case where where each rank has different tokens.\n"
             "Besides, this value will be stored in a GPU buffer, which is friendly for CUDA graph.")
         .insert("e", "32", "num of experts")
-        .insert("k", "5", "topk")
-        .insert("h", "8192", "hidden_size of this model")
-        .insert("i", "8192", "intermediate_size between 2 gemms of FFN")
+        .insert("k", "8", "topk")
+        .insert("h", "2048", "hidden_size of this model")
+        .insert("i", "512", "intermediate_size between 2 gemms of FFN")
         .insert("stride", "-1", "stride per row, if -1 then equal to hidden_size")
         .insert("bm", "32", "blocking factor for sorted tokens")
-        .insert("tp", "8", "tensor parallel size")
+        .insert("tp", "1", "tensor parallel size")
         .insert("v", "1", "cpu validation or not")
         .insert("kname", "1", "print kernel name or not")
-        .insert("prec_i", "bf16", "input precision")
-        .insert("prec_w", "bf16", "weight precision")
+        .insert("prec_i", "fp8", "input precision")
+        .insert("prec_w", "fp8", "weight precision")
         .insert("prec_o", "bf16", "output precision")
         .insert("prec_st", "auto", "token scale data type. auto will set to fp32")
         .insert("prec_sw", "auto", "weight scale data type. auto will set to fp32")
@@ -123,9 +123,9 @@ auto create_args(int argc, char* argv[])
         .insert(
             "gate_only", "1", "w0(gate/up) style, 0:gate+up will double interm size, 1:only gate")
         .insert("api", "0", "benchmark api set: 0:fused-moe(moe-gemm+moe-sorting), 1:moe-gemm")
-        .insert("act", "0", "activation after first gemm. 0:gelu, 1:silu")
+        .insert("act", "1", "activation after first gemm. 0:gelu, 1:silu")
         .insert("balance",
-                "0",
+                "1",
                 "if set to 1, will try balance the expert in topk-ids(convenient for testing)")
         .insert("init",
                 "1",
@@ -457,7 +457,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
         if(ave_time < 0)
         {
-            std::cout << " not supported!" << std::endl << std::flush;
+            std::cout << " not supported! [api=0]" << std::endl << std::flush;
             return false;
         }
 
@@ -619,7 +619,7 @@ bool run(const ck_tile::ArgParser& arg_parser)
 
         if(ave_time < 0)
         {
-            std::cout << " not supported!" << std::endl << std::flush;
+            std::cout << " not supported! [api=1]" << std::endl << std::flush;
             return false;
         }
 
@@ -708,6 +708,19 @@ int main(int argc, char* argv[])
                    arg_parser)
                    ? 0
                    : -2;
+    }
+    else if(prec_i == "fp8" && prec_w == "fp8" && prec_o == "bf16" && prec_kw == "fp32")
+    {
+        return run<ck_tile::fp16_t, ck_tile::fp16_t, ck_tile::fp16_t, float, float, float, float>(
+                   arg_parser)
+                   ? 0
+                   : -2;
+    }
+    else
+    {
+        std::cout << "not supported type combination: " << prec_i << ", " << prec_w << ", "
+                  << prec_o << ", " << prec_st << ", " << prec_sw << ", " << prec_sq << ", "
+                  << prec_kw << std::endl;
     }
 
     return -3;
