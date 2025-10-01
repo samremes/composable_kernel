@@ -422,15 +422,17 @@ struct BlockFmhaV3PipelineDefaultPolicy
     CK_TILE_DEVICE static constexpr auto GetSingleSmemElementSpaceSize()
     {
         // this function assume K/V can share smem
+        // Calculate based on actual LDS descriptor layout to align with MakeKLdsBlockDescriptor() & MakeVLdsBlockDescriptor()
         constexpr index_t SingleKSize = [&]() {
             constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN0;
-            constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK1;
+            constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK0;
             constexpr index_t NumWarps   = Problem::BlockFmhaShape::NumWarps;
             constexpr index_t WarpSize   = ck_tile::get_warp_size();
 
-            constexpr index_t KPack   = GetSmemKPackK<Problem>(); // this is for lds
             constexpr index_t KVector = GetAlignmentK<Problem>(); // this is for global load
-            constexpr index_t kPad    = KPack;
+            constexpr index_t kPad =
+                kKLdsPadInBytes /
+                sizeof(typename Problem::KDataType); // Use same pad as MakeKLdsStoreBlockDescriptor
 
             static_assert(WarpSize * KVector >= kKPerBlock && WarpSize * KVector % kKPerBlock == 0);
             constexpr index_t LanesPerK  = kKPerBlock / KVector;
@@ -441,18 +443,22 @@ struct BlockFmhaV3PipelineDefaultPolicy
         }();
 
         constexpr index_t SingleVSize = [&]() {
-            using VDataType                = remove_cvref_t<typename Problem::VDataType>;
-            constexpr index_t Banks        = 32; // TODO: need change based on arch
-            constexpr index_t PixelsPerRow = Banks * 4 / sizeof(VDataType);
-            constexpr index_t kKPack       = GetSmemKPackK<Problem>();
-            static_assert(PixelsPerRow % kKPack == 0);
-            constexpr index_t NPerRow    = PixelsPerRow / kKPack;
-            constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kN1;
-            constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kK1;
-            static_assert(kNPerBlock % NPerRow == 0);
-            static_assert(kKPerBlock % kKPack == 0);
+            constexpr index_t kNPerBlock = Problem::BlockFmhaShape::kK1;
+            constexpr index_t kKPerBlock = Problem::BlockFmhaShape::kN1;
+            constexpr index_t NumWarps   = Problem::BlockFmhaShape::NumWarps;
+            constexpr index_t WarpSize   = ck_tile::get_warp_size();
 
-            return (kKPerBlock / kKPack) * (kNPerBlock / NPerRow) * (PixelsPerRow + kKPack);
+            constexpr index_t KVector = GetAlignmentV<Problem>(); // this is for global load
+            constexpr index_t kPad =
+                kVLdsPadInBytes /
+                sizeof(typename Problem::VDataType); // Use same pad as MakeVLdsStoreBlockDescriptor
+
+            static_assert(WarpSize * KVector >= kKPerBlock && WarpSize * KVector % kKPerBlock == 0);
+            constexpr index_t LanesPerK  = kKPerBlock / KVector;
+            constexpr index_t LaneGroups = WarpSize / LanesPerK;
+            constexpr index_t NumIssues  = kNPerBlock / (LaneGroups * NumWarps);
+
+            return NumIssues * NumWarps * (WarpSize * KVector + kPad);
         }();
 
         return max(SingleKSize, SingleVSize);
@@ -573,23 +579,19 @@ struct BlockFmhaV3PipelineDefaultPolicy
 
         static_assert(MakeKLdsLoadBlockDescriptor<Problem>().get_element_space_size() ==
                       MakeKLdsStoreBlockDescriptor<Problem>().get_element_space_size());
-        // constexpr index_t k_element_space_size =
-        //     MakeKLdsLoadBlockDescriptor<Problem>().get_element_space_size();
+        constexpr index_t k_element_space_size =
+            MakeKLdsLoadBlockDescriptor<Problem>().get_element_space_size();
 
         static_assert(MakeVLdsLoadBlockDescriptor<Problem>().get_element_space_size() ==
                       MakeVLdsStoreBlockDescriptor<Problem>().get_element_space_size());
-        // constexpr index_t v_element_space_size =
-        //     MakeVLdsLoadBlockDescriptor<Problem>().get_element_space_size();
+        constexpr index_t v_element_space_size =
+            MakeVLdsLoadBlockDescriptor<Problem>().get_element_space_size();
 
-        // TODO: fix for gfx942, the sizes are too large
-        // static_assert(k_element_space_size == 4152);
-        // static_assert(v_element_space_size == 4320);
-        // static_assert(GetSingleSmemElementSpaceSize<Problem>() == 4608);
-        // static_assert(ck_tile::max(k_element_space_size, v_element_space_size) <=
-        //               GetSingleSmemElementSpaceSize<Problem>());
+        // Verify that K/V element space sizes fit within the allocated single buffer space
+        static_assert(ck_tile::max(k_element_space_size, v_element_space_size) <=
+                      GetSingleSmemElementSpaceSize<Problem>(),
+                      "K/V element space size exceeds allocated single SMEM buffer size");
 
-        /// TODO: override GetSingleSmemElementSpaceSize() to align with MakeKLdsBlockDescriptor() &
-        /// MakeVLdsBlockDescriptor()
         static_assert(std::is_same_v<typename Problem::KDataType, typename Problem::VDataType>);
         constexpr index_t kv_element_space_size_in_bytes =
             GetSingleSmemElementSpaceSize<Problem>() * sizeof(typename Problem::KDataType);

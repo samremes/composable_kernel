@@ -696,17 +696,49 @@ struct BlockFmhaFwdV3Pipeline
 
         auto K_lds_load = [&](auto k_lds_read_idx) {
             kv_tile.k_tile = load_tile(k_lds_window_load(k_lds_read_idx));
+            
+            // DEBUG: Check K values after LDS load
+            // if(__builtin_amdgcn_readfirstlane(__builtin_amdgcn_workitem_id_x()) == 0 && 
+            //    __builtin_amdgcn_readfirstlane(__builtin_amdgcn_workgroup_id_x()) == 0) {
+            //     printf("[DEBUG] k_tile[0]=%f\n", static_cast<float>(kv_tile.k_tile.get_thread_buffer()[0]));
+            // }
         };
 
         auto V_mem_load = [&](auto v_lds_write_idx) {
+#if defined(__gfx950__)
             async_load_tile_raw(v_lds_window_store(v_lds_write_idx), v_dram_window);
-
+#else
+            // Since on gfx942 we don't have transpose load instruction, we need to store data pre-transposed in LDS
+            // Load regularly from global memory
+            auto v_tile_tmp  = load_tile(v_dram_window);
+            // Transpose tile in registers - TODO: create the shuffled tile distribution
+            auto shuffle_tmp = make_static_distributed_tensor<ADataType>(Policy::template MakeVDramTileDistribution<Problem>());
+            transpose_tile2d(shuffle_tmp, v_tile_tmp);
+            // Finally store it to LDS
+            store_tile(v_lds_window_store(v_lds_write_idx), shuffle_tmp);
+#endif
             /// FIXME: use the future-predicting method to move the window
             move_tile_window(v_dram_window, {kK1, 0});
         };
 
         auto V_lds_load = [&](auto v_lds_read_idx) {
+#if defined(__gfx950__)            
             kv_tile.v_tile = load_tile_transpose(v_lds_window_load(v_lds_read_idx));
+#else
+            // Data should be pre-transposed in lds so we can load it directly
+            // TODO: make sure that the v_lds_window_load is created with the right descriptor
+            kv_tile.v_tile = load_tile(v_lds_window_load(v_lds_read_idx));
+#endif
+            
+            // DEBUG: Check V values after LDS load
+            // if(__builtin_amdgcn_readfirstlane(__builtin_amdgcn_workitem_id_x()) == 0 && 
+            //    __builtin_amdgcn_readfirstlane(__builtin_amdgcn_workgroup_id_x()) == 0) {
+            //     printf("[DEBUG] v_tile[0:4]=[%f,%f,%f,%f]\n", 
+            //            static_cast<float>(kv_tile.v_tile.get_thread_buffer()[0]),
+            //            static_cast<float>(kv_tile.v_tile.get_thread_buffer()[1]),
+            //            static_cast<float>(kv_tile.v_tile.get_thread_buffer()[2]),
+            //            static_cast<float>(kv_tile.v_tile.get_thread_buffer()[3]));
+            // }
         };
 
         decltype(m) m_old;
@@ -731,9 +763,14 @@ struct BlockFmhaFwdV3Pipeline
             m_latest.thread_buf_[0] = f_max(bit_cast<SMPLComputeDataType>(swapped_regs.x),
                                             bit_cast<SMPLComputeDataType>(swapped_regs.y));
 #else
-            block_tile_reduce_sync(m_latest, f_max, bool_constant<false>{});
+            // Use CrossWarp=true to avoid permlane32_swap in warp_shuffle_down_pair
+            block_tile_reduce_sync(m_latest, f_max, bool_constant<false>{}, bool_constant<true>{});
 #endif
             m = m_latest;
+            // if(__builtin_amdgcn_readfirstlane(__builtin_amdgcn_workitem_id_x()) == 0 && 
+            //         __builtin_amdgcn_readfirstlane(__builtin_amdgcn_workgroup_id_x()) == 0) {
+            //     printf("[DEBUG] m_latest[0]=%f\n", static_cast<float>(m_latest.thread_buf_[0]));
+            // }
 
             constexpr auto p_spans =
                 std::decay_t<decltype(sp(sp_reg_idx).sp_compute)>::get_distributed_spans();
@@ -775,7 +812,8 @@ struct BlockFmhaFwdV3Pipeline
             rowsum_p.thread_buf_[0] = f_sum(bit_cast<SMPLComputeDataType>(swapped_regs.x),
                                             bit_cast<SMPLComputeDataType>(swapped_regs.y));
 #else
-            block_tile_reduce_sync(rowsum_p, f_sum, bool_constant<false>{});
+            // Use CrossWarp=true to avoid permlane32_swap in warp_shuffle_down_pair
+            block_tile_reduce_sync(rowsum_p, f_sum, bool_constant<false>{}, bool_constant<true>{});
 #endif
 
             // l{j}
@@ -844,6 +882,12 @@ struct BlockFmhaFwdV3Pipeline
                        get_slice_tile(kv_tile.v_tile,
                                       sequence<0, (k1_loops - 1) * kK1>{},
                                       sequence<kN1, k1_loops * kK1>{}));
+                
+                // DEBUG: Check P*V result
+                // if(__builtin_amdgcn_readfirstlane(__builtin_amdgcn_workitem_id_x()) == 0 && 
+                //    __builtin_amdgcn_readfirstlane(__builtin_amdgcn_workgroup_id_x()) == 0) {
+                //     printf("[DEBUG] o_acc[0]=%f\n", static_cast<float>(o_acc.thread_buf_[0]));
+                // }
             }
         };
 
@@ -1230,6 +1274,12 @@ struct BlockFmhaFwdV3Pipeline
         });
 
         o_acc = tile_elementwise_in(o_acc_element_func, o_acc);
+
+        // DEBUG: Check if we have valid l values before final division
+        // if(__builtin_amdgcn_readfirstlane(__builtin_amdgcn_workitem_id_x()) == 0 && 
+        //    __builtin_amdgcn_readfirstlane(__builtin_amdgcn_workgroup_id_x()) == 0) {
+        //     printf("[DEBUG] Before return: have o_acc and l\\n");
+        // }
 
         return o_acc;
     }
