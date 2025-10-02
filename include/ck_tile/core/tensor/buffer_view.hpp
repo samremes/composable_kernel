@@ -879,7 +879,8 @@ struct buffer_view<address_space_enum::lds,
             return amd_transpose_load_to_vgpr<remove_cvref_t<T>, t_per_x>(p_data_ + i +
                                                                           linear_offset);
 #else
-            return X{numeric<remove_cvref_t<T>>::zero()};
+            static_assert(false, "Error: transpose load not supported on this architecture.");
+            return X{};
 #endif
         }
         else
